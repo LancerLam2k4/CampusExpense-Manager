@@ -40,7 +40,7 @@
         android:background="@android:color/darker_gray"
         android:layout_marginEnd="8dp"/>
 
-
+    <!-- Category -->
     <TextView
         android:id="@+id/expenseCategory"
         android:layout_width="0dp"
@@ -56,6 +56,7 @@
         android:layout_height="match_parent"
         android:background="@android:color/darker_gray"
         android:layout_marginEnd="8dp"/>
+
     <!-- Date -->
     <TextView
         android:id="@+id/expenseDate"
@@ -76,19 +77,17 @@
     <!-- Update Icon -->
     <ImageView
         android:id="@+id/ic_update"
-        android:layout_width="0dp"
+        android:layout_width="24dp"
         android:layout_height="24dp"
         android:src="@drawable/ic_update"
         android:layout_gravity="center_vertical"
-        android:layout_weight="0.5"
         android:layout_marginEnd="8dp"/>
 
     <!-- Delete Icon -->
     <ImageView
         android:id="@+id/ic_delete"
-        android:layout_width="0dp"
+        android:layout_width="24dp"
         android:layout_height="24dp"
         android:src="@drawable/ic_delete"
-        android:layout_gravity="center_vertical"
-        android:layout_weight="0.5"/>
+        android:layout_gravity="center_vertical"/>
 </LinearLayout>

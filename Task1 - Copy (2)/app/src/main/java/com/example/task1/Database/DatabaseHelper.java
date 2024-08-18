@@ -17,7 +17,7 @@ import java.util.List;
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "expense_manager.db";
-    private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 5;
 
     // Table and column names
     public static final String TABLE_USERS = "users";
@@ -26,6 +26,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     public static final String COLUMN_USER_EMAIL = "email";
     public static final String COLUMN_USER_PASSWORD = "password";
     public static final String COLUMN_USER_PHONE = "phone";
+    public static final String COLUMN_USER_INITIAL = "initial_budget";
 
     public static final String TABLE_CATEGORIES = "categories";
     public static final String COLUMN_CATEGORY_ID = "id";
@@ -54,7 +55,9 @@ public class DatabaseHelper extends SQLiteOpenHelper {
                     COLUMN_USER_NAME + " TEXT, " +
                     COLUMN_USER_EMAIL + " TEXT UNIQUE, " +
                     COLUMN_USER_PASSWORD + " TEXT, " +
-                    COLUMN_USER_PHONE + " TEXT " + ");";
+                    COLUMN_USER_PHONE + " TEXT, " +
+                    COLUMN_USER_INITIAL + " REAL DEFAULT 0" + // Thêm trường initial_budget
+                    ");";
 
     private static final String TABLE_CREATE_CATEGORIES =
             "CREATE TABLE " + TABLE_CATEGORIES + " (" +
@@ -132,6 +135,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.delete(TABLE_SESSION, null, null);
         db.close();
     }
+
     public boolean isSessionActive() {
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.query(TABLE_SESSION, null, null, null, null, null, null);
@@ -158,9 +162,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
 
-
-
-
     //Budget Tab
     public void addCategory(String name, double amount, int userId) {
         SQLiteDatabase db = getWritableDatabase();
@@ -171,6 +172,29 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.insert(TABLE_CATEGORIES, null, values);
         db.close();
     }
+    public void updateCategory(Category category) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(COLUMN_CATEGORY_NAME, category.getName());
+        values.put(COLUMN_CATEGORY_AMOUNT, category.getAmount());
+
+        String whereClause = COLUMN_CATEGORY_ID + "=?";
+        String[] whereArgs = { String.valueOf(category.getId()) };
+
+        db.update(TABLE_CATEGORIES, values, whereClause, whereArgs);
+        db.close();
+    }
+    public void deleteCategory(int categoryId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        String whereClause = COLUMN_CATEGORY_ID + "=?";
+        String[] whereArgs = { String.valueOf(categoryId) };
+
+        db.delete(TABLE_CATEGORIES, whereClause, whereArgs);
+        db.close();
+    }
+
+
+
 
     public List<Category> getCategories(int userId) {
         List<Category> categories = new ArrayList<>();
@@ -193,36 +217,71 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.close();
         return categories;
     }
+    public double getTotalExpensesForCategory(int categoryId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        String query = "SELECT SUM(" + COLUMN_EXPENSE_AMOUNT + ") FROM " + TABLE_EXPENSES + " WHERE " + COLUMN_EXPENSE_CATEGORY_ID + " = ?";
+        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(categoryId)});
 
+        double total = 0;
+        if (cursor.moveToFirst()) {
+            total = cursor.getDouble(0);
+        }
+        cursor.close();
+        db.close();
+        return total;
+    }
+
+
+    public boolean hasExpensesForCategory(int categoryId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        String query = "SELECT COUNT(*) FROM " + TABLE_EXPENSES + " WHERE " + COLUMN_EXPENSE_CATEGORY_ID + " = ?";
+        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(categoryId)});
+
+        boolean hasExpenses = false;
+        if (cursor.moveToFirst()) {
+            int count = cursor.getInt(0);
+            hasExpenses = count > 0;
+        }
+        cursor.close();
+        db.close();
+        return hasExpenses;
+    }
+
+
+
+    // Xóa tất cả Expenses liên quan đến Category
+    public void deleteExpensesForCategory(int categoryId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.delete(TABLE_EXPENSES, COLUMN_EXPENSE_CATEGORY_ID + "=?", new String[]{String.valueOf(categoryId)});
+        db.close();
+    }
 
 
     // Add a new expense
     // Get all expenses for a specific user
     public List<Expense> getExpensesByUser(int userId) {
         List<Expense> expenses = new ArrayList<>();
-        SQLiteDatabase db = getReadableDatabase();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_EXPENSES, null, "user_id=?", new String[]{String.valueOf(userId)}, null, null, null);
 
-        Cursor cursor = db.query(TABLE_EXPENSES,
-                new String[]{COLUMN_EXPENSE_ID, COLUMN_EXPENSE_NAME, COLUMN_EXPENSE_USER_ID, COLUMN_EXPENSE_AMOUNT, COLUMN_EXPENSE_CATEGORY_ID, COLUMN_EXPENSE_DATE},
-                COLUMN_EXPENSE_USER_ID + "=?",
-                new String[]{String.valueOf(userId)},
-                null, null, COLUMN_EXPENSE_DATE + " DESC");
-
-        if (cursor.moveToFirst()) {
+        if (cursor != null && cursor.moveToFirst()) {
             do {
-                int id = cursor.getInt(cursor.getColumnIndex(COLUMN_EXPENSE_ID));
-                String name = cursor.getString(cursor.getColumnIndex(COLUMN_EXPENSE_NAME));
-                double amount = cursor.getDouble(cursor.getColumnIndex(COLUMN_EXPENSE_AMOUNT));
-                int categoryId = cursor.getInt(cursor.getColumnIndex(COLUMN_EXPENSE_CATEGORY_ID));
-                String date = cursor.getString(cursor.getColumnIndex(COLUMN_EXPENSE_DATE));
+                int id = cursor.getInt(cursor.getColumnIndex("id"));
+                String name = cursor.getString(cursor.getColumnIndex("name"));
+                double amount = cursor.getDouble(cursor.getColumnIndex("amount"));
+                int categoryId = cursor.getInt(cursor.getColumnIndex("category_id"));
+                String date = cursor.getString(cursor.getColumnIndex("date"));
 
-                expenses.add(new Expense( userId, name, amount, categoryId, date));
+                expenses.add(new Expense(id, userId, name, amount, categoryId, date));
             } while (cursor.moveToNext());
+
+            cursor.close();
         }
-        cursor.close();
-        db.close();
+
         return expenses;
     }
+
+
 
     // Add a new expense
     public double getTotalExpensesByCategoryId(int categoryId) {
@@ -245,6 +304,25 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
         return 0.0;
     }
+    public double getTotalExpenses(int userId) {
+        double totalExpenses = 0.0;
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        String query = "SELECT SUM(" + COLUMN_EXPENSE_AMOUNT + ") as Total FROM " + TABLE_EXPENSES +
+                " WHERE user_id = ?";
+
+        Cursor cursor = db.rawQuery(query, new String[] { String.valueOf(userId) });
+
+        if (cursor.moveToFirst()) {
+            totalExpenses = cursor.getDouble(cursor.getColumnIndex("Total"));
+        }
+
+        cursor.close();
+        db.close();
+
+        return totalExpenses;
+    }
+
 
     // Thêm chi tiêu
     public void addExpense(Expense expense) {
@@ -259,96 +337,34 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     }
 
 
-    // Get a specific expense by ID
-    public Expense getExpenseById(int expenseId) {
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.query(TABLE_EXPENSES,
-                new String[]{COLUMN_EXPENSE_ID, COLUMN_EXPENSE_NAME, COLUMN_EXPENSE_USER_ID, COLUMN_EXPENSE_AMOUNT, COLUMN_EXPENSE_CATEGORY_ID, COLUMN_EXPENSE_DATE},
-                COLUMN_EXPENSE_ID + "=?",
-                new String[]{String.valueOf(expenseId)},
-                null, null, null);
-
-        if (cursor != null && cursor.moveToFirst()) {
-            int id = cursor.getInt(cursor.getColumnIndex(COLUMN_EXPENSE_ID));
-            String name = cursor.getString(cursor.getColumnIndex(COLUMN_EXPENSE_NAME));
-            int userId = cursor.getInt(cursor.getColumnIndex(COLUMN_EXPENSE_USER_ID));
-            double amount = cursor.getDouble(cursor.getColumnIndex(COLUMN_EXPENSE_AMOUNT));
-            int categoryId = cursor.getInt(cursor.getColumnIndex(COLUMN_EXPENSE_CATEGORY_ID));
-            String date = cursor.getString(cursor.getColumnIndex(COLUMN_EXPENSE_DATE));
-
-            cursor.close();
-            return new Expense( userId, name, amount, categoryId, date);
-        }
-
-        return null;
-    }
-
-    // Update an existing expense
     public int updateExpense(Expense expense) {
-        SQLiteDatabase db = getWritableDatabase();
+        SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
+        if (expense.getId() <= 0) {
+            Log.e("AddExpenseDialog", "Invalid expense ID: " + expense.getId());
+
+        }
+        // Đảm bảo các cột này đúng tên như trong schema
         values.put(COLUMN_EXPENSE_NAME, expense.getName());
-        values.put(COLUMN_EXPENSE_USER_ID, expense.getUserId());
         values.put(COLUMN_EXPENSE_AMOUNT, expense.getAmount());
+        values.put(COLUMN_EXPENSE_USER_ID, expense.getUserId());
         values.put(COLUMN_EXPENSE_CATEGORY_ID, expense.getCategoryId());
         values.put(COLUMN_EXPENSE_DATE, expense.getDate());
 
+        // Cập nhật bản ghi trong database dựa vào ID
         int rowsAffected = db.update(TABLE_EXPENSES, values, COLUMN_EXPENSE_ID + "=?",
                 new String[]{String.valueOf(expense.getId())});
+
+        // Đóng kết nối với database sau khi update
         db.close();
+
+        // Kiểm tra kết quả của việc cập nhật, nếu không có dòng nào bị ảnh hưởng
+        if (rowsAffected == 0) {
+            // Log thông tin hoặc xử lý nếu cần
+            Log.e("Database", "Update failed, no row affected for expense id: " + expense.getId());
+        }
         return rowsAffected;
     }
-
-    // Delete an expense
-    public void deleteExpense(int expenseId) {
-        SQLiteDatabase db = getWritableDatabase();
-        db.delete(TABLE_EXPENSES, COLUMN_EXPENSE_ID + "=?",
-                new String[]{String.valueOf(expenseId)});
-        db.close();
-    }
-
-
-
-    // DatabaseHelper.java
-
-    // Method to retrieve all category names
-    // DatabaseHelper.java
-
-//    public List<String> getAllCategoryNames(int userId) {
-//        List<String> categories = new ArrayList<>();
-//        SQLiteDatabase db = this.getReadableDatabase();
-//        String query = "SELECT name FROM Categories WHERE user_id = ?";
-//        Cursor cursor = db.rawQuery(query, new String[]{String.valueOf(userId)});
-//
-//        if (cursor.moveToFirst()) {
-//            do {
-//                String categoryName = cursor.getString(0);
-//                categories.add(categoryName);
-//            } while (cursor.moveToNext());
-//        }
-//        cursor.close();
-//        db.close();
-//        return categories;
-//    }
-
-
-    // Method to get category ID by name
-    public int getCategoryIdByName(String categoryName) {
-        int categoryId = -1; // Default value if not found
-        SQLiteDatabase db = this.getReadableDatabase();
-
-        String query = "SELECT " + COLUMN_CATEGORY_ID + " FROM " + TABLE_CATEGORIES + " WHERE " + COLUMN_CATEGORY_NAME + " = ?";
-        Cursor cursor = db.rawQuery(query, new String[]{categoryName});
-
-        if (cursor.moveToFirst()) {
-            categoryId = cursor.getInt(cursor.getColumnIndexOrThrow(COLUMN_CATEGORY_ID));
-        }
-        cursor.close();
-        db.close();
-
-        return categoryId;
-    }
-
 
     public String getCategoryNameById(int categoryId) {
         SQLiteDatabase db = getReadableDatabase();
@@ -367,50 +383,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return categoryName;
     }
 
-
-    public List<Expense> getAllExpensesByUserId(int userId) {
-        List<Expense> expenses = new ArrayList<>();
-        SQLiteDatabase db = getReadableDatabase();
-        Cursor cursor = db.query(TABLE_EXPENSES,
-                new String[]{COLUMN_EXPENSE_ID, COLUMN_EXPENSE_NAME, COLUMN_EXPENSE_AMOUNT, COLUMN_EXPENSE_CATEGORY_ID, COLUMN_EXPENSE_DATE},
-                COLUMN_USER_ID + "=?",
-                new String[]{String.valueOf(userId)},
-                null, null, null);
-
-        while (cursor.moveToNext()) {
-            int id = cursor.getInt(cursor.getColumnIndex(COLUMN_EXPENSE_ID));
-            String name = cursor.getString(cursor.getColumnIndex(COLUMN_EXPENSE_NAME));
-            double amount = cursor.getDouble(cursor.getColumnIndex(COLUMN_EXPENSE_AMOUNT));
-            int categoryId = cursor.getInt(cursor.getColumnIndex(COLUMN_EXPENSE_CATEGORY_ID));
-            String date = cursor.getString(cursor.getColumnIndex(COLUMN_EXPENSE_DATE));
-
-            expenses.add(new Expense( userId, name, amount, categoryId, date));
-        }
-        cursor.close();
-        db.close();
-        return expenses;
-    }
-
-    // Method to get user ID from the session
-    public int getUserId() {
-        SQLiteDatabase db = this.getReadableDatabase();
-        int userId = -1; // Default value if no session exists
-
-        // Query to get the session
-        Cursor cursor = db.query(TABLE_SESSION, new String[]{COLUMN_SESSION_USER_ID},
-                null, null, null, null, null);
-
-        // Check if a session exists and retrieve user ID
-        if (cursor != null && cursor.moveToFirst()) {
-            userId = cursor.getInt(cursor.getColumnIndex(COLUMN_SESSION_USER_ID));
-            cursor.close();
-        }
-
-        db.close();
-        return userId;
-    }
-
-    // DatabaseHelper.java
 
     public List<String> getAllCategoryNames(int userId) {
         List<String> categoryNames = new ArrayList<>();
@@ -434,7 +406,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
 
 
-    // Phương thức lấy categoryId từ tên danh mục
     public int getCategoryIdByName(int userId, String categoryName) {
         SQLiteDatabase db = this.getReadableDatabase();
         String query = "SELECT id FROM Categories WHERE user_id = ? AND name = ?";
@@ -449,6 +420,75 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         cursor.close();
         db.close();
         return -1; // Nếu không tìm thấy categoryId
+    }
+
+
+
+    public void deleteExpense(int expenseId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.delete("expenses", "id = ?", new String[]{String.valueOf(expenseId)});
+        db.close();
+    }
+    public double getInitialBudget(int userId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query("users", new String[]{"initial_budget"},
+                "id = ?", new String[]{String.valueOf(userId)},
+                null, null, null);
+        if (cursor != null && cursor.moveToFirst()) {
+            double initialBudget = cursor.getDouble(cursor.getColumnIndex("initial_budget"));
+            cursor.close();
+            return initialBudget;
+        }
+        return 0.0;
+    }
+
+    public void updateInitialBudget(int userId, double initialBudget) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put("initial_budget", initialBudget);
+        db.update("users", values, "id = ?", new String[]{String.valueOf(userId)});
+    }
+
+// DatabaseHelper.java
+
+    public void updateUser(User user) {
+        SQLiteDatabase db = this.getWritableDatabase();
+
+        ContentValues values = new ContentValues();
+        values.put("name", user.getName());
+        values.put("phone", user.getPhone());
+        values.put("password", user.getPassword()); // Hash the password in real applications for security
+
+        // Update the user record in the database
+        String selection = "id = ?";
+        String[] selectionArgs = { String.valueOf(user.getId()) };
+
+        int count = db.update(
+                "users",
+                values,
+                selection,
+                selectionArgs
+        );
+
+        if (count > 0) {
+            Log.d("DatabaseHelper", "User updated successfully.");
+        } else {
+            Log.d("DatabaseHelper", "User update failed.");
+        }
+    }
+// DatabaseHelper.java
+
+    public void deleteSession() {
+        SQLiteDatabase db = this.getWritableDatabase();
+
+        // Delete all records from the session table
+        int rowsDeleted = db.delete("session", null, null);
+
+        if (rowsDeleted > 0) {
+            Log.d("DatabaseHelper", "Session deleted successfully.");
+        } else {
+            Log.d("DatabaseHelper", "Session deletion failed.");
+        }
     }
 
 

@@ -6,12 +6,15 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.DatePicker;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.fragment.app.Fragment;
@@ -35,6 +38,8 @@ public class HomeFragment extends Fragment {
     private DatabaseHelper databaseHelper;
     private int userId;
     private String selectedDate;
+    private TextView totalExpensesValue ;
+
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -42,10 +47,11 @@ public class HomeFragment extends Fragment {
 
         fabAddExpense = view.findViewById(R.id.fabAddExpense);
         listViewExpenses = view.findViewById(R.id.expensesList);
-
+        totalExpensesValue = view.findViewById(R.id.totalExpensesValue);
         databaseHelper = new DatabaseHelper(getActivity());
         setUserIdFromSession();
         loadExpenses();
+        loadTotal();
 
         fabAddExpense.setOnClickListener(v -> showAddExpenseDialog());
 
@@ -67,11 +73,9 @@ public class HomeFragment extends Fragment {
         Button btnSelectDate = dialogView.findViewById(R.id.btnSelectDate);
         Button btnSaveExpense = dialogView.findViewById(R.id.btnAddExpense);
 
-        // Set current date on the Button
         selectedDate = getCurrentDate();
         btnSelectDate.setText(selectedDate);
 
-        // Load categories into spinner
         loadCategoriesIntoSpinner(categorySpinner);
 
         btnSelectDate.setOnClickListener(v -> showDatePickerDialog(btnSelectDate));
@@ -91,9 +95,9 @@ public class HomeFragment extends Fragment {
                     if (totalExpenses + amount > budget) {
                         Toast.makeText(getActivity(), "Exceeds budget limit!", Toast.LENGTH_SHORT).show();
                     } else {
-                        // Add expense to database
                         databaseHelper.addExpense(new Expense(userId, expenseName, amount, categoryId, selectedDate));
                         loadExpenses();
+                        loadTotal();
                         dialog.dismiss();
                     }
                 } catch (NumberFormatException e) {
@@ -134,8 +138,15 @@ public class HomeFragment extends Fragment {
 
     private void loadExpenses() {
         List<Expense> expenses = databaseHelper.getExpensesByUser(userId);
-        ExpenseAdapter adapter = new ExpenseAdapter(getActivity(), expenses);
+        ExpenseAdapter adapter = new ExpenseAdapter(getActivity(), expenses,
+                expense -> showUpdateExpenseDialog(expense),
+                expense -> showDeleteConfirmationDialog(expense) // Thêm listener xóa
+        );
         listViewExpenses.setAdapter(adapter);
+    }
+    private void loadTotal(){
+        double totalExpenses = databaseHelper.getTotalExpenses(userId);
+        totalExpensesValue.setText(String.format("$%.2f", totalExpenses));
     }
 
     private void setUserIdFromSession() {
@@ -152,5 +163,73 @@ public class HomeFragment extends Fragment {
 
     private int getCategoryIdByName(String categoryName) {
         return databaseHelper.getCategoryIdByName(userId, categoryName);
+    }
+
+    private void showUpdateExpenseDialog(Expense expense) {
+        LayoutInflater inflater = getLayoutInflater();
+        View dialogView = inflater.inflate(R.layout.dialog_edit_expense, null);
+
+        AlertDialog.Builder dialogBuilder = new AlertDialog.Builder(getActivity());
+        dialogBuilder.setView(dialogView);
+        AlertDialog dialog = dialogBuilder.create();
+        dialog.show();
+
+        EditText expenseNameEditText = dialogView.findViewById(R.id.expenseName);
+        EditText amountEditText = dialogView.findViewById(R.id.expenseAmount);
+        Spinner categorySpinner = dialogView.findViewById(R.id.categorySpinner);
+        Button btnSelectDate = dialogView.findViewById(R.id.btnSelectDate);
+        Button btnSaveExpense = dialogView.findViewById(R.id.btnSaveExpense);
+
+        expenseNameEditText.setText(expense.getName());
+        amountEditText.setText(String.valueOf(expense.getAmount()));
+        btnSelectDate.setText(expense.getDate());
+        selectedDate = expense.getDate();
+
+        loadCategoriesIntoSpinner(categorySpinner);
+        categorySpinner.setSelection(((ArrayAdapter<String>) categorySpinner.getAdapter()).getPosition(databaseHelper.getCategoryNameById(expense.getCategoryId())));
+
+        btnSelectDate.setOnClickListener(v -> showDatePickerDialog(btnSelectDate));
+
+        btnSaveExpense.setOnClickListener(v -> {
+            String expenseName = expenseNameEditText.getText().toString();
+            String amountStr = amountEditText.getText().toString();
+            String categoryName = categorySpinner.getSelectedItem().toString();
+
+            if (!expenseName.isEmpty() && !amountStr.isEmpty()) {
+                try {
+                    double amount = Double.parseDouble(amountStr);
+                    int categoryId = getCategoryIdByName(categoryName);
+                    double totalExpenses = databaseHelper.getTotalExpensesByCategoryId(categoryId);
+                    double previousAmount = expense.getAmount();
+                    double budget = databaseHelper.getCategoryAmount(categoryId);
+
+                    if (totalExpenses - previousAmount + amount > budget) {
+                        Toast.makeText(getActivity(), "Exceeds budget limit!", Toast.LENGTH_SHORT).show();
+                    } else {
+                        databaseHelper.updateExpense(new Expense(expense.getId(), userId, expenseName, amount, categoryId, selectedDate));
+                        loadExpenses();
+                        loadTotal();
+                        dialog.dismiss();
+                    }
+                } catch (NumberFormatException e) {
+                    Toast.makeText(getActivity(), "Invalid amount format", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                Toast.makeText(getActivity(), "Please fill out all fields", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void showDeleteConfirmationDialog(Expense expense) {
+        new AlertDialog.Builder(getActivity())
+                .setTitle("Confirm Delete")
+                .setMessage("Are you sure you want to delete this expense?")
+                .setPositiveButton("Yes", (dialog, which) -> {
+                    databaseHelper.deleteExpense(expense.getId());
+                    loadExpenses();
+                    loadTotal();
+                })
+                .setNegativeButton("No", null)
+                .show();
     }
 }

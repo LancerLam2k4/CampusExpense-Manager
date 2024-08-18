@@ -32,7 +32,8 @@
             android:orientation="vertical"
             android:background="@color/my_green"
             android:padding="16dp"
-            android:layout_weight="1">
+            android:layout_weight="1"
+            android:id="@+id/BudgetSetup">
 
             <TextView
                 android:id="@+id/originalBudgetLabel"
@@ -44,7 +45,7 @@
                 android:textColor="@color/black" />
 
             <TextView
-                android:id="@+id/originalBudgetValue"
+                android:id="@+id/initialBudgetValue"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="$0.00"
@@ -61,7 +62,8 @@
             android:background="@color/my_orange"
             android:padding="16dp"
             android:layout_weight="1"
-            android:layout_marginStart="16dp">
+            android:layout_marginStart="16dp"
+            android:id="@+id/currentBudgetLayout" >
 
             <TextView
                 android:id="@+id/currentBudgetLabel"

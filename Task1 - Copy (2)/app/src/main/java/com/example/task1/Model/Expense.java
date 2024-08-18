@@ -15,6 +15,14 @@ public class Expense {
         this.categoryId = categoryId;
         this.date = date;
     }
+    public Expense(int id, int userId, String name, double amount, int categoryId, String date) {
+        this.id = id;
+        this.userId = userId;
+        this.name = name;
+        this.amount = amount;
+        this.categoryId = categoryId;
+        this.date = date;
+    }
 
     // Getters and setters
     public int getId() {

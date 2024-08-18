@@ -19,4 +19,7 @@
 
     <color name="my_orange">#ffa07a</color>
     <color name="my_green">#00fa9a</color>
+    <color name="my_yellow">#FFEB3B</color>
+    <color name="my_red">#F44336</color>
+    <color name="setting">#cccccc</color>
 </resources>

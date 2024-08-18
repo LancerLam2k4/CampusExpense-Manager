@@ -74,7 +74,7 @@ public class RegisterActivity extends AppCompatActivity {
         }
 
         if (password.length() <= 5) {
-            Toast.makeText(this, "Password must be longer than 5 characters", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Password must be longer than 6 characters", Toast.LENGTH_SHORT).show();
             return;
         }
 

@@ -15,7 +15,7 @@
         android:layout_centerHorizontal="true"
         android:layout_marginBottom="16dp"/>
 
-    <!-- Khối 2: Chi phí đã sử dụng -->
+    <!-- Khối 2: Tổng chi phí đã sử dụng, căn giữa nội dung -->
     <LinearLayout
         android:id="@+id/totalExpensesLayout"
         android:layout_width="match_parent"
@@ -25,7 +25,8 @@
         android:background="@drawable/rounded_corners"
         android:layout_below="@id/logo"
         android:layout_marginTop="16dp"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="16dp"
+        android:gravity="center"> <!-- Căn giữa các thành phần bên trong -->
 
         <TextView
             android:id="@+id/totalExpensesLabel"
@@ -88,7 +89,7 @@
         android:layout_below="@id/expensesHeaderLayout"
         android:layout_alignParentBottom="true"
         android:fillViewport="true"
-        android:scrollbars="none"> <!-- Ẩn thanh cuộn -->
+        android:scrollbars="none">
 
         <LinearLayout
             android:id="@+id/expensesLayout"
